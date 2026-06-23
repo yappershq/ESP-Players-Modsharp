@@ -44,8 +44,32 @@ internal sealed class EspCommandHandler : IModule
         _logger = logger;
     }
 
-    public bool Init()
+    public bool Init() => true;
+
+    public void OnAllSharpModulesLoaded()
     {
+        var flag = _config.TogglePermission;
+
+        // If a permission flag is configured, AdminManager must be present to gate it.
+        // Without AdminManager the permission can't be checked or registered — install nothing
+        // rather than a fallback that would deny every caller including root admins.
+        if (!string.IsNullOrWhiteSpace(flag))
+        {
+            if (_bridge.AdminManager is null)
+            {
+                _logger.LogError(
+                    "[EspPlayers] AdminManager unavailable — esp/glow/showplayers commands NOT registered " +
+                    "(requires AdminManager for permission gating via '{Flag}').", flag);
+                return;
+            }
+
+            // Declare the custom permission with AdminManager so wildcard grants (root "*",
+            // group wildcards) expand over it. A permission that is never registered is invisible
+            // to the wildcard index, so only an admin granted the EXACT flag would resolve it —
+            // locking out root admins. Mounting a manifest lets "*" / group wildcards resolve it.
+            _bridge.RegisterAdminPermission(flag);
+        }
+
         foreach (var name in CommandNames)
         {
             IClientManager.DelegateClientCommand cb = OnToggleCommand;
@@ -54,21 +78,6 @@ internal sealed class EspCommandHandler : IModule
         }
 
         _logger.LogInformation("[EspPlayers] Registered {Count} toggle command alias(es)", _registered.Count);
-        return true;
-    }
-
-    public void OnAllSharpModulesLoaded()
-    {
-        // Register the configured toggle permission with AdminManager. Without this, a custom
-        // flag (e.g. "@espplayers/use") is unknown to the global permission index, so wildcard
-        // grants like root "*" never expand to cover it — only an admin granted the EXACT flag
-        // would pass, silently locking out root admins. Mounting a manifest that declares the
-        // permission lets "*" / group wildcards resolve it.
-        var flag = _config.TogglePermission;
-        if (string.IsNullOrWhiteSpace(flag))
-            return;
-
-        _bridge.RegisterAdminPermission(flag);
     }
 
     public void Shutdown()
@@ -105,16 +114,9 @@ internal sealed class EspCommandHandler : IModule
         if (string.IsNullOrWhiteSpace(flag))
             return true;
 
-        var adminManager = _bridge.AdminManager;
-        if (adminManager is null)
-        {
-            // No AdminManager but a flag was configured — fail closed so a permission isn't
-            // silently bypassed.
-            _logger.LogWarning("[EspPlayers] esp_toggle_permission set but AdminManager unavailable — denying toggle");
-            return false;
-        }
-
-        var admin = adminManager.GetAdmin(client.SteamId);
+        // AdminManager presence is guaranteed at registration time (OnAllSharpModulesLoaded
+        // returns early without installing commands when AdminManager is null and a flag is set).
+        var admin = _bridge.AdminManager?.GetAdmin(client.SteamId);
         return admin is not null && admin.HasPermission(flag);
     }
 
