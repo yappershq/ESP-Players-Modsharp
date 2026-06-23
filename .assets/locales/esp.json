@@ -1,0 +1,14 @@
+{
+  "Esp_Prefix": {
+    "en-US": "{{green}}[ESP]{{default}}"
+  },
+  "Esp_Enabled": {
+    "en-US": "Player ESP is now {{green}}enabled{{default}} — you can see other players' outlines."
+  },
+  "Esp_Disabled": {
+    "en-US": "Player ESP is now {{red}}disabled{{default}}."
+  },
+  "Esp_No_Permission": {
+    "en-US": "{{red}}You do not have permission to use ESP."
+  }
+}

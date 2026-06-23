@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>EspPlayers</AssemblyName>
+    <RootNamespace>EspPlayers</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.7" />
+  </ItemGroup>
+
+  <!-- Copy .assets/* (locales, etc) into .build/ so modsharp-deploy bundles them -->
+  <Target Name="CopyAssets" AfterTargets="Build">
+    <PropertyGroup>
+      <AssetsDir>$(MSBuildThisFileDirectory)..\.assets\</AssetsDir>
+      <BuildDir>$(MSBuildThisFileDirectory)..\.build\</BuildDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_AssetFiles Include="$(AssetsDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AssetFiles)"
+          DestinationFiles="@(_AssetFiles -> '$(BuildDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
