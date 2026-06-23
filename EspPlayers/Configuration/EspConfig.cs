@@ -53,8 +53,9 @@ internal interface IEspConfig
     bool ShowOnlyEnemyTeam { get; }
 
     /// <summary>
-    /// Which viewers may see ESP: 0 = any, 1 = dead only, 2 = spectators only.
-    /// Mirrors the original Show_ESP_For knob.
+    /// Which viewers may see ESP: 0 = any, 1 = dead only, 2 = spectators only,
+    /// 3 = viewer's controller team is Unassigned OR Spectator (the default — spectator-only tool).
+    /// Mirrors the original Show_ESP_For knob, extended with the authoritative team-based mode.
     /// </summary>
     int ShowEspFor { get; }
 
@@ -99,10 +100,10 @@ internal sealed class EspConfig : IEspConfig
         _cvGlowColorT        = cv.CreateConVar("esp_glow_color_t",         "243,0,93",  "Glow color for T team (R,G,B)");
         _cvGlowRange         = cv.CreateConVar("esp_glow_range",           5000,  "Max glow render range in units (0 = always visible)");
         _cvShowOnlyEnemyTeam = cv.CreateConVar("esp_show_only_enemy_team", true,  "Viewer sees only enemy-team glows [0=off, 1=on]");
-        _cvShowEspFor        = cv.CreateConVar("esp_show_for",             0,     "Who may see ESP: 0=any, 1=dead only, 2=spectators only");
+        _cvShowEspFor        = cv.CreateConVar("esp_show_for",             3,     "Who may see ESP: 0=any, 1=dead only, 2=spectators only, 3=Unassigned/Spectator team only (default)");
         _cvDisableGlowOnGotv = cv.CreateConVar("esp_disable_on_gotv",      false, "Hide glows from GOTV/HLTV viewers [0=off, 1=on]");
         _cvDefaultToggle     = cv.CreateConVar("esp_default_toggle",       false, "Default ESP state for new players [0=off, 1=on]");
-        _cvTogglePermission  = cv.CreateConVar("esp_toggle_permission",    "",    "Admin permission required to toggle ESP (empty = everyone). e.g. @espplayers/use");
+        _cvTogglePermission  = cv.CreateConVar("esp_toggle_permission",    "@esp/use", "Admin permission required to toggle ESP (empty = everyone). Default @esp/use = admin-only");
         _cvHideToggleCommand = cv.CreateConVar("esp_hide_command",         false, "Hide the toggle command from chat [0=off, 1=on]");
 
         // Generate/load editable config at sharp/configs/esp.cfg so admin edits survive restarts.
@@ -119,9 +120,9 @@ internal sealed class EspConfig : IEspConfig
     public EspColor GlowColorT        => EspColor.Parse(_cvGlowColorT?.GetString(),  DefaultTColor);
     public int      GlowRange         => _cvGlowRange?.GetInt32() ?? 5000;
     public bool     ShowOnlyEnemyTeam => _cvShowOnlyEnemyTeam?.GetBool() ?? true;
-    public int      ShowEspFor        => _cvShowEspFor?.GetInt32() ?? 0;
+    public int      ShowEspFor        => _cvShowEspFor?.GetInt32() ?? 3;
     public bool     DisableGlowOnGotv => _cvDisableGlowOnGotv?.GetBool() ?? false;
     public bool     DefaultToggle     => _cvDefaultToggle?.GetBool() ?? false;
-    public string   TogglePermission  => _cvTogglePermission?.GetString() ?? "";
+    public string   TogglePermission  => _cvTogglePermission?.GetString() ?? "@esp/use";
     public bool     HideToggleCommand => _cvHideToggleCommand?.GetBool() ?? false;
 }

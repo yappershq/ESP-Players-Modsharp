@@ -55,9 +55,6 @@ internal sealed class EspGlowManager : IModule, IEntityListener, IGameListener, 
     private Action<IPlayerSpawnForwardParams>?  _spawnForward;
     private Action<IPlayerKilledForwardParams>? _killedForward;
 
-    // player_team game event covers ALL team changes (manual jointeam, autoteam, scrambles).
-    private bool _teamEventHooked;
-
     public EspGlowManager(
         InterfaceBridge bridge,
         IEspConfig config,
@@ -292,9 +289,18 @@ internal sealed class EspGlowManager : IModule, IEntityListener, IGameListener, 
             return;
         }
 
-        // Hook BOTH entities hidden-by-default; per-viewer state opened below.
-        _bridge.TransmitManager.AddEntityHooks(relay, false);
-        _bridge.TransmitManager.AddEntityHooks(glow, false);
+        // Hook BOTH entities hidden-by-default; per-viewer state opened below. The bool return
+        // MUST be checked: if a hook is rejected the entity keeps the engine default (transmit to
+        // EVERYONE), which would leak the glow to viewers who never enabled ESP. Bail + tear down
+        // rather than ship a non-gated outline.
+        if (!_bridge.TransmitManager.AddEntityHooks(relay, false)
+         || !_bridge.TransmitManager.AddEntityHooks(glow, false))
+        {
+            _logger.LogWarning("[EspPlayers] AddEntityHooks rejected for slot {Slot}; tearing down glow", ownerSlot);
+            KillEntity(glow.Index);
+            KillEntity(relay.Index);
+            return;
+        }
 
         _relayIndex[ownerSlot] = (int)relay.Index;
         _glowIndex[ownerSlot]  = (int)glow.Index;
@@ -415,14 +421,18 @@ internal sealed class EspGlowManager : IModule, IEntityListener, IGameListener, 
         if (mode <= 0)
             return true; // any
 
-        var isSpec = viewerCtrl.Team == CStrikeTeam.Spectator;
+        // Authoritative team straight off the controller — not pawn/alive state. A live T/CT
+        // sees nothing; they must move to Spectator/Unassigned to use ESP.
+        var team   = viewerCtrl.Team;
+        var isSpec = team == CStrikeTeam.Spectator;
         var pawn   = viewerCtrl.GetPlayerPawn();
         var isDead = pawn is null || !pawn.IsValidEntity || !pawn.IsAlive;
 
         return mode switch
         {
-            1 => isDead,            // dead only
-            2 => isSpec,            // spectators only
+            1 => isDead,                                                    // dead only
+            2 => isSpec,                                                    // spectators only
+            3 => team is CStrikeTeam.UnAssigned or CStrikeTeam.Spectator,  // Unassigned/Spectator team only (default)
             _ => true,
         };
     }
