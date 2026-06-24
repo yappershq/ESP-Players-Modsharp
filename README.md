@@ -1,85 +1,72 @@
-# ESP Players (ModSharp / CS2)
+<div align="center">
+  <h1><strong>EspPlayers</strong></h1>
+  <p>Server-controlled, per-viewer player glow / ESP for ModSharp (CS2).</p>
+</div>
 
-Per-viewer, opt-in player **ESP / glow outlines** for Counter-Strike 2 servers running
-[ModSharp](https://github.com/Kxnrl/modsharp-public).
+<p align="center">
+  <img src="https://img.shields.io/github/license/yappershq/ESP-Players-Modsharp" alt="License">
+  <img src="https://img.shields.io/github/stars/yappershq/ESP-Players-Modsharp?style=flat&logo=github" alt="Stars">
+</p>
 
-A player toggles ESP with a chat command and, **only for that player**, other players are
-drawn with a team-coloured glow outline. Visibility is filtered independently for every
-viewer through the transmit system, so players who have **not** enabled ESP never receive
-the glow entities at all.
+---
 
-> This is a **server-operator-controlled** feature. Whether it is available, who may use it,
-> and how it behaves are entirely up to the server admin via ConVars (see below). It can be
-> locked behind an admin permission, restricted to dead/spectator viewers, or disabled
-> outright.
+EspPlayers gives players a team-coloured glow outline that only viewers who opt in (and pass the configured gating) can see — useful for spectators, GOTV, dead players, or anywhere a server wants controllable wallhack-style ESP. It is a ModSharp/CS2 port of [oqyh/cs2-ESP-Players-GoldKingZ](https://github.com/oqyh/cs2-ESP-Players-GoldKingZ).
 
-## Credit
+## 🚀 Install
 
-Ported from **[oqyh/cs2-ESP-Players-GoldKingZ](https://github.com/oqyh/cs2-ESP-Players-GoldKingZ)**
-(a CounterStrikeSharp plugin) to ModSharp. All original design credit to oqyh / GoldKingZ.
+Copy the build output into your ModSharp install (`<sharp>` = your `sharp` directory):
 
-## How it works
+| From | To |
+|------|----|
+| `.build/modules/EspPlayers/` | `<sharp>/modules/EspPlayers/` |
+| `.build/locales/esp.json` | `<sharp>/locales/esp.json` |
 
-For each alive player, two `prop_dynamic` entities cloning the player's model are spawned:
+Restart the server (or change map) to load. The config file `configs/esp.cfg` is auto-generated on first run.
 
-- a **relay** (`rendermode = kRenderNone`, invisible) that follows the player's pawn, and
-- a **glow** (`glowstate = 3`, team-coloured) that follows the relay.
+Optional dependencies (all degrade gracefully if absent): **LocalizerManager** (chat messages), **AdminManager** (permission gating — if `esp_toggle_permission` is set but AdminManager is missing, the toggle commands are not registered), **ClientPreferences** (persists each player's toggle state).
 
-Both entities are hooked **hidden from everyone by default**
-(`ITransmitManager.AddEntityHooks(entity, false)`). For each viewer the glow is then opened
-or closed per-viewer via `ITransmitManager.SetEntityState(entityIndex, viewerControllerIndex,
-canSee, -1)`. A viewer only sees a glow when **all** of these hold:
+## ⌨️ Commands
 
-- the viewer is not the glow's owner,
-- the viewer has ESP toggled on,
-- the viewer passes the `esp_show_for` gating (any / dead-only / spectators-only),
-- enemy-team-only filtering allows it (`esp_show_only_enemy_team`), and
-- GOTV filtering allows it (`esp_disable_on_gotv`).
+| Command | Aliases | Description | Permission |
+|---------|---------|-------------|------------|
+| `esp` | `glow`, `showplayers`, `css_esp`, `css_glow`, `css_showplayers` | Toggle ESP glows on/off for the calling player | `@esp/use` (configurable via `esp_toggle_permission`; empty = everyone) |
 
-Everything is **event-driven** (player spawn / death / team change / toggle), so there is no
-per-tick scan.
+## ⚙️ Configuration
 
-## Commands
+`configs/esp.cfg` (auto-generated from ConVar defaults on first run; edits are reapplied each load):
 
-| Command | Description |
-| --- | --- |
-| `!esp` / `!glow` / `!showplayers` | Toggle ESP for yourself (also `css_*` aliases). |
+| ConVar | Default | Meaning |
+|--------|---------|---------|
+| `esp_enabled` | `1` | Enable ESP Players [0=off, 1=on] |
+| `esp_glow_color_ct` | `0,190,255` | Glow color for CT team (R,G,B) |
+| `esp_glow_color_t` | `243,0,93` | Glow color for T team (R,G,B) |
+| `esp_glow_range` | `5000` | Max glow render range in units (0 = always visible) |
+| `esp_show_only_enemy_team` | `1` | Viewer sees only enemy-team glows [0=off, 1=on] |
+| `esp_show_for` | `3` | Who may see ESP: 0=any, 1=dead only, 2=spectators only, 3=Unassigned/Spectator team only |
+| `esp_disable_on_gotv` | `0` | Hide glows from GOTV/HLTV viewers [0=off, 1=on] |
+| `esp_default_toggle` | `0` | Default ESP state for new players [0=off, 1=on] |
+| `esp_toggle_permission` | `@esp/use` | Admin permission required to toggle ESP (empty = everyone) |
+| `esp_hide_command` | `0` | Hide the toggle command from chat [0=off, 1=on] |
 
-The per-player choice is persisted via ModSharp's **ClientPreferences** (cookie key
-`esp_enabled`), so it survives reconnects and restarts.
+## 🔧 How it works
 
-## Configuration
+For each alive player the plugin spawns a relay + glow `prop_dynamic` pair that clones the player's model and tints it by team. Per-viewer transmit (`ITransmitManager.SetEntityState`) then exposes each glow only to viewers who enabled ESP and pass the configured gating; everyone else never receives the entities. The whole thing is event-driven — spawn, death, round restart, disconnect, toggle and team change events refresh the relevant glows — with no per-tick scanning.
 
-ConVars are written to an editable file at `sharp/configs/esp.cfg` on first run; edits there
-are re-applied on every restart.
-
-| ConVar | Default | Description |
-| --- | --- | --- |
-| `esp_enabled` | `1` | Master switch. |
-| `esp_glow_color_ct` | `0,190,255` | Glow color for CT (R,G,B). |
-| `esp_glow_color_t` | `243,0,93` | Glow color for T (R,G,B). |
-| `esp_glow_range` | `5000` | Max glow render range in units (0 = always visible). |
-| `esp_show_only_enemy_team` | `1` | Viewer sees only enemy-team glows. |
-| `esp_show_for` | `0` | Who may see ESP: 0 = any, 1 = dead only, 2 = spectators only. |
-| `esp_disable_on_gotv` | `0` | Hide glows from GOTV / HLTV viewers. |
-| `esp_default_toggle` | `0` | Default ESP state for players with no saved preference. |
-| `esp_toggle_permission` | `` (empty) | Admin permission required to toggle (empty = everyone). e.g. `@espplayers/use`. |
-| `esp_hide_command` | `0` | Suppress the toggle command from chat. |
-
-## Building
+## 📦 Build
 
 ```bash
-dotnet build EspPlayers.slnx -c Release
+dotnet build -c Release
 ```
 
-Output lands in `.build/` (`modules/EspPlayers/EspPlayers.dll` + `locales/esp.json`), ready
-for `modsharp-deploy`.
+Outputs `.build/modules/EspPlayers/EspPlayers.dll` and the locale file `.build/locales/esp.json`.
 
-## Dependencies
+## 🙏 Credits
 
-Optional ModSharp modules, resolved at runtime if present:
+Port of [oqyh/cs2-ESP-Players-GoldKingZ](https://github.com/oqyh/cs2-ESP-Players-GoldKingZ) by oqyh.
 
-- **ClientPreferences** — persists the per-player toggle (without it, the toggle works for
-  the current session but does not save).
-- **LocalizerManager** — localized chat messages (falls back to keys if absent).
-- **AdminManager** — only needed when `esp_toggle_permission` is set.
+---
+
+<div align="center">
+  <p>Made with ❤️ by <a href="https://github.com/yappershq">yappershq</a></p>
+  <p>⭐ Star this repo if you find it useful!</p>
+</div>
